@@ -3,7 +3,7 @@ package config
 import "os"
 
 var (
-	SECRET        = getVar("SECRET", "adsads")
+	SECRET        = getVar("SECRET", "")
 	SERVER_LISTEN = getVar("SERVER_LISTEN", "127.0.0.1:3000")
 )
 

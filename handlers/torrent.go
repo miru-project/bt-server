@@ -3,15 +3,17 @@ package handlers
 import (
 	"bytes"
 	"fmt"
+	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
+
 	"github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/log"
 	"github.com/miru-project/bt-server/app"
-	"net/http"
-	"net/url"
-	"strconv"
-	"strings"
+	"github.com/miru-project/bt-server/models"
 )
 
 func TorrentStatus(c *fiber.Ctx) error {
@@ -19,7 +21,14 @@ func TorrentStatus(c *fiber.Ctx) error {
 }
 
 func ListTorrent(c *fiber.Ctx) error {
-	return c.JSON(app.Torrents)
+	var result []models.TorrentResult
+	for hash, t := range app.Torrents {
+		result = append(result, models.TorrentResult{
+			InfoHash: hash,
+			Name:     t.Name(),
+		})
+	}
+	return c.JSON(result)
 }
 
 func AddTorrent(c *fiber.Ctx) error {
@@ -32,8 +41,14 @@ func AddTorrent(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	app.Torrents[t.InfoHash().HexString()] = t
-	return c.JSON(t.Info())
+	hex := t.InfoHash().HexString()
+
+	app.Torrents[hex] = t
+
+	return c.JSON(models.TorrentDetailResult{
+		InfoHash: hex,
+		Detail:   t.Info(),
+	})
 }
 
 func GetTorrentData(c *fiber.Ctx) error {
@@ -42,7 +57,7 @@ func GetTorrentData(c *fiber.Ctx) error {
 	path := params["*1"]
 	t, ok := app.Torrents[infoHash]
 	if !ok {
-		return c.SendString("torrent not found")
+		return c.Status(http.StatusNotFound).SendString("torrent not found")
 	}
 	if path == "" {
 		return c.JSON(t.Info())
@@ -61,18 +76,19 @@ func GetTorrentData(c *fiber.Ctx) error {
 			return serverTorrentData(c, file.NewReader(), file.Length())
 		}
 	}
-	return c.SendString("file not found")
+	return c.Status(http.StatusNotFound).SendString("file not found")
 }
 
 func serverTorrentData(c *fiber.Ctx, reader torrent.Reader, fileSize int64) error {
 	c.Set("Content-Type", "video/mp4")
 
-	defer func(reader torrent.Reader) {
-		err := reader.Close()
-		if err != nil {
-			log.Error(err.Error())
-		}
-	}(reader)
+	// defer func(reader torrent.Reader) {
+	// 	err := reader.Close()
+	// 	if err != nil {
+	// 		log.Error(err.Error())
+	// 	}
+	// }(reader)
+
 	reader.SetResponsive()
 
 	rangeHeader := c.Get("Range")

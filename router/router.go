@@ -2,7 +2,7 @@ package router
 
 import (
 	"github.com/miru-project/bt-server/app"
-	"github.com/miru-project/bt-server/handlers"
+	handlers "github.com/miru-project/bt-server/handler"
 )
 
 func init() {

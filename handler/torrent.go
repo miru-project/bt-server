@@ -16,7 +16,8 @@ import (
 	"github.com/gofiber/fiber/v2/log"
 	"github.com/miru-project/bt-server/app"
 	"github.com/miru-project/bt-server/config"
-	"github.com/miru-project/bt-server/models"
+	models "github.com/miru-project/bt-server/model"
+	"github.com/miru-project/bt-server/util"
 )
 
 func TorrentStatus(c *fiber.Ctx) error {
@@ -85,12 +86,12 @@ func DeleteTorrent(c *fiber.Ctx) error {
 func GetTorrentData(c *fiber.Ctx) error {
 	params := c.AllParams()
 	infoHash := params["infoHash"]
-	path := params["*1"]
+	filePath := params["*1"]
 	t, ok := app.Torrents[infoHash]
 	if !ok {
 		return c.Status(http.StatusNotFound).SendString("torrent not found")
 	}
-	if path == "" {
+	if filePath == "" {
 		files := []string{}
 		if len(t.Info().Files) == 0 {
 			files = append(files, t.Name())
@@ -106,24 +107,34 @@ func GetTorrentData(c *fiber.Ctx) error {
 		})
 	}
 	files := t.Files()
-	unescape, err := url.PathUnescape(path)
+	unescape, err := url.PathUnescape(filePath)
 	log.Info(unescape)
 	if err != nil {
 		log.Error(err.Error())
 	}
+	// 获取文件后缀
+	fileExtension := path.Ext(unescape)
 	if len(files) == 0 && unescape == t.Name() {
-		return serverTorrentData(c, t.NewReader(), t.Length())
+		return serverTorrentData(c, fileExtension, t.NewReader(), t.Length())
 	}
 	for _, file := range files {
 		if file.DisplayPath() == unescape {
-			return serverTorrentData(c, file.NewReader(), file.Length())
+			return serverTorrentData(c, fileExtension, file.NewReader(), file.Length())
 		}
 	}
 	return c.Status(http.StatusNotFound).SendString("file not found")
 }
 
-func serverTorrentData(c *fiber.Ctx, reader torrent.Reader, fileSize int64) error {
-	c.Set("Content-Type", "video/mp4")
+func serverTorrentData(c *fiber.Ctx, fileExtension string, reader torrent.Reader, fileSize int64) error {
+	// 获取文件后缀
+	mime, ok := util.IsMedia(fileExtension)
+	log.Info(mime, fileExtension)
+	if !ok {
+		c.Set("Content-Type", "application/octet-stream")
+		return c.SendStream(reader)
+	}
+
+	c.Set("Content-Type", mime)
 	reader.SetResponsive()
 	rangeHeader := c.Get("Range")
 	if rangeHeader != "" {

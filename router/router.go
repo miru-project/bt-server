@@ -10,5 +10,6 @@ func init() {
 	app.App.Get("/status", handlers.TorrentStatus)
 	app.App.Get("/torrent", handlers.ListTorrent)
 	app.App.Post("/torrent", handlers.AddTorrent)
+	app.App.Delete("/torrent/:infoHash/*", handlers.DeleteTorrent)
 	app.App.Get("/torrent/:infoHash/*", handlers.GetTorrentData)
 }

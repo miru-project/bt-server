@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
+	"path"
 	"strconv"
 	"strings"
 
@@ -13,6 +15,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/log"
 	"github.com/miru-project/bt-server/app"
+	"github.com/miru-project/bt-server/config"
 	"github.com/miru-project/bt-server/models"
 )
 
@@ -51,6 +54,24 @@ func AddTorrent(c *fiber.Ctx) error {
 	})
 }
 
+func DeleteTorrent(c *fiber.Ctx) error {
+	infoHash := c.Params("infoHash")
+	t, ok := app.Torrents[infoHash]
+	if !ok {
+		return c.Status(http.StatusNotFound).SendString("torrent not found")
+	}
+	t.Drop()
+
+	if config.AUTO_DELETE_CACHE_FILE == "true" {
+		if err := os.RemoveAll(path.Join(config.DATA_DIR, t.Name())); err != nil {
+			return c.Status(http.StatusInternalServerError).SendString("Internal server error")
+		}
+	}
+
+	delete(app.Torrents, infoHash)
+	return c.SendStatus(http.StatusOK)
+}
+
 func GetTorrentData(c *fiber.Ctx) error {
 	params := c.AllParams()
 	infoHash := params["infoHash"]
@@ -81,16 +102,7 @@ func GetTorrentData(c *fiber.Ctx) error {
 
 func serverTorrentData(c *fiber.Ctx, reader torrent.Reader, fileSize int64) error {
 	c.Set("Content-Type", "video/mp4")
-
-	// defer func(reader torrent.Reader) {
-	// 	err := reader.Close()
-	// 	if err != nil {
-	// 		log.Error(err.Error())
-	// 	}
-	// }(reader)
-
 	reader.SetResponsive()
-
 	rangeHeader := c.Get("Range")
 	if rangeHeader != "" {
 		ranges := strings.Split(rangeHeader, "=")[1]

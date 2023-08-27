@@ -32,7 +32,11 @@ func init() {
 	})
 
 	log.Info("Starting BT client")
-	BTClient, err = torrent.NewClient(nil)
+
+	cc := torrent.NewDefaultClientConfig()
+	cc.DataDir = config.DATA_DIR
+
+	BTClient, err = torrent.NewClient(cc)
 	if err != nil {
 		log.Fatal(err)
 	}

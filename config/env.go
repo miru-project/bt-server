@@ -2,6 +2,8 @@ package config
 
 import "os"
 
+const VERSION = "0.0.1"
+
 var (
 	SECRET                 = getVar("SECRET", "")
 	SERVER_LISTEN          = getVar("SERVER_LISTEN", "127.0.0.1:3000")

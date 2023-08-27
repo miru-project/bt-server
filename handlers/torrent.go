@@ -48,9 +48,19 @@ func AddTorrent(c *fiber.Ctx) error {
 
 	app.Torrents[hex] = t
 
+	files := []string{}
+	if len(t.Info().Files) == 0 {
+		files = append(files, t.Name())
+	} else {
+		for _, file := range t.Info().Files {
+			files = append(files, file.DisplayPath(t.Info()))
+		}
+	}
+
 	return c.JSON(models.TorrentDetailResult{
 		InfoHash: hex,
 		Detail:   t.Info(),
+		Files:    files,
 	})
 }
 
@@ -81,7 +91,19 @@ func GetTorrentData(c *fiber.Ctx) error {
 		return c.Status(http.StatusNotFound).SendString("torrent not found")
 	}
 	if path == "" {
-		return c.JSON(t.Info())
+		files := []string{}
+		if len(t.Info().Files) == 0 {
+			files = append(files, t.Name())
+		} else {
+			for _, file := range t.Info().Files {
+				files = append(files, file.DisplayPath(t.Info()))
+			}
+		}
+		return c.JSON(models.TorrentDetailResult{
+			InfoHash: infoHash,
+			Detail:   t.Info(),
+			Files:    files,
+		})
 	}
 	files := t.Files()
 	unescape, err := url.PathUnescape(path)

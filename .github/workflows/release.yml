@@ -4,18 +4,86 @@ on:
       - v*
 
 jobs:
-  releases-matrix:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: build Android Arm64
+        uses: wangyoucao577/go-release-action@v1.49
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          goos: android
+          goarch: arm64
+          compress_assets: "OFF"
+          ldflags: "-s -w"
+      - name: Install Android NDK
+        run: |
+          wget https://dl.google.com/android/repository/android-ndk-r26d-linux.zip
+          unzip android-ndk-r26d-linux.zip
+          echo "NDK=$(pwd)/android-ndk-r26d" >> $GITHUB_ENV
+      - name: Build Go for Android ARM V-7A
+        run: |
+          CGO_ENABLED=1 \
+          GOOS=android \
+          GOARCH=arm \
+          CC=$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/armv7a-linux-androideabi21-clang \
+          # CC_FOR_TARGET=$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/armv7a-linux-androideabi21-clang \
+          go build -o build/bt-server-android-armv7a -ldflags "-s -w" .
+      # - name: Build Go for Android i386
+      #   run: |
+      #     CGO_ENABLED=1 \
+      #     GOOS=android \
+      #     GOARCH=386 \
+      #     CC=$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/i686-linux-android21-clang \
+      #     go build -o build/bt-server-android-i386 -ldflags "-s -w" .
+      # - name: Build Go for Android x86_64
+      #   run: |
+      #     CGO_ENABLED=1 \
+      #     GOOS=android \
+      #     GOARCH=amd64 \
+      #     CC=$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android21-clang \
+      #     go build -o build/bt-server-android-x86_64 -ldflags "-s -w" .
+      - name: Compile Window and Linux
+        uses: crazy-max/ghaction-xgo@v3
+        with:
+          xgo_version: latest
+          go_version: latest
+          # targets: linux/386,linux/amd64,linux/arm,linux/arm64,windows/386,windows/amd64,windows/arm,windows/arm64,android-21/arm,android-21/arm64,android-21/386,android-21/amd64
+          prefix: bt-server
+          tags: ${{ github.ref_name }}
+          v: true
+          ldflags: -s -w
+          dest: build
+      
+      - name: Rename Files
+        run: |
+          for file in build/*; do
+            mv "$file" "${file/bt-server-/bt-server-${{ github.ref_name }}-}"
+          done
+      - name: Release Packages
+        uses: ncipollo/release-action@v1
+        with:
+          artifacts: "build/*"
+          allowUpdates: true
+          omitBody: true
+          tag: ${{ github.ref_name }}
+  window-release-matrix:
     name: Release Go Binary
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        goos: [linux, windows,android]
-        goarch: ["386", amd64, arm64, arm]
+        goos: [windows]
+        goarch: ["386", arm64, arm]
     steps:
     - uses: actions/checkout@v3
-    - uses: wangyoucao577/go-release-action@v1.40
+    - uses: wangyoucao577/go-release-action@v1.49
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         goos: ${{ matrix.goos }}
         goarch: ${{ matrix.goarch }}
         compress_assets: "OFF"
+        ldflags: "-s -w"
